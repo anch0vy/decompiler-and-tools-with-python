@@ -20,13 +20,27 @@ class ELF:
 		self.text = elf.get_section_by_name('.text').data()
 		self.text_addr = elf.get_section_by_name('.text').header['sh_addr']
 		dynsym = elf.get_section_by_name('.dynsym')
-		dynsym_list = []
+
+		dynsym_list = [0]
+		if self.bit == 64:
+			relplt = elf.get_section_by_name('.rela.plt')
+		elif self.bit == 32:
+			relplt = elf.get_section_by_name('.rel.plt')
+		relpltdata = relplt.data()
+		for x in range(0,len(relpltdata),relplt.header['sh_entsize']):
+			tmp = relpltdata[x:x+relplt.header['sh_entsize']]
+			if self.bit == 64:
+				_,_,num,_ = unpack('QIIQ',tmp)
+			elif self.bit == 32:
+				_,num = unpack('II',tmp)
+				num = num >> 8
+			dynsym_list.append(num)
+
+		c = 0
 		for sym in dynsym.iter_symbols():
-			type = sym.entry['st_info']['type']
-			if type == 'STT_NOTYPE' and sym.entry['st_info']['bind'] == 'STB_WEAK':
-				continue
-			if type not in ['STT_OBJECT']:#,'STT_NOTYPE']:
-				dynsym_list.append(sym.name)
+			if c in dynsym_list:
+				dynsym_list[dynsym_list.index(c)] = sym.name
+			c+=1
 
 		got_plt = elf.get_section_by_name('.got.plt')
 		got_plt_data = got_plt.data()
@@ -36,7 +50,8 @@ class ELF:
 
 		for n in range(0,len(plt_data),16):
 			tmp = n + plt.header['sh_addr']
-			self.funcs[tmp]= dynsym_list[n/16]
+			self.funcs[tmp] = dynsym_list[n/16]
+			print dynsym_list[n/16]
 
 		before = None
 		if self.bit == 32:

@@ -80,10 +80,12 @@ class decompile:
 						break
 					else:
 						failend.append(i.address)
+	def asm2ir(self):
+		pass
 
 
 if __name__ == '__main__':
-	q = decompile('ls')
+	q = decompile('a.out_strip')
 	print '[*]EP:',hex(q.ep)
 	q.findFunction()
 	print '[*]found function num:',len(q.funcs.keys())
