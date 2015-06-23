@@ -51,7 +51,6 @@ class ELF:
 		for n in range(0,len(plt_data),16):
 			tmp = n + plt.header['sh_addr']
 			self.funcs[tmp] = dynsym_list[n/16]
-			print dynsym_list[n/16]
 
 		before = None
 		if self.bit == 32:
@@ -67,6 +66,10 @@ class ELF:
 					self.ep = before.operands[1].imm
 					break
 				before = i
+
+		self.rodata = elf.get_section_by_name('.rodata')
+		self.rodata_data = self.rodata.data()
+
 		f.close()
 
 

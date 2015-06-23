@@ -1,3 +1,5 @@
+import re
+
 from type import REG
 from elfparser import ELF
 from capstone import *
@@ -54,7 +56,6 @@ class decompile:
 							if all(map(lambda x:x<=i.address,jmps)):
 								self.funcs[func_addr_start] = [i.address - func_addr_start + i.size , True]
 								break
-
 						else:
 							jmps.append(jmpaddr)
 
@@ -80,16 +81,66 @@ class decompile:
 						break
 					else:
 						failend.append(i.address)
-	def asm2ir(self):
-		pass
 
+	def asm2ir(self):
+		for n in self.funcs.keys():
+			print 'function:',hex(n)
+			length = self.funcs[n][0]
+			stack = []
+			reg = {}
+			#reg[X86_REG_RAX] = [[X86_REG_AL,None],[X86_REG_AH,None],[X86_REG_AX,None],[X86_REG_EAX,None],[X86_REG_RAX,None]]
+			code = self.text[n - self.text_addr:n - self.text_addr + length]
+			if code.startswith('\x55\x89\xe5') or code.startswith('\x55\x48\x89\xe5'):
+				#start with push bp, mov bp,sp
+				if self.bit == 32:
+					code = code[3:]
+					n = n + 3
+				else:
+					code = code[4:]
+					n = n + 4
+
+			for i in self.md.disasm(code,n):				
+				if i.mnemonic == 'sub':
+					print i.operands[0]
+					if i.operands[0].reg == X86_REG_RSP or i.operands[0].reg == X86_REG_ESP:
+						stack = stack + [None] * (i.operands[1].imm / 4)
+				
+				# print "0x%x:\t%s\t%s" %(i.address , i.mnemonic, i.op_str),
+				# print stack
+
+
+	def checkrodata(self,addr):
+		rodata_start_addr = self.elf.rodata.header['sh_addr']
+		addr = addr - rodata_start_addr
+		found = re.findall("[^\x00-\x1F\x7F-\xFF]{4,}", self.elf.rodata_data[addr:])
+		if len(found) > 0:
+			if self.elf.rodata_data.index(found[0]) == addr:
+				return found[0]
+		return None
 
 if __name__ == '__main__':
 	q = decompile('a.out_strip')
 	print '[*]EP:',hex(q.ep)
 	q.findFunction()
+	q.asm2ir()
+	exit()
 	print '[*]found function num:',len(q.funcs.keys())
 	print '[*]addr_start addr_end function_length analyzed_flag'
 	for n in q.funcs.keys():
 		print hex(n), hex(n+q.funcs[n][0]),q.funcs[n]
-	
+
+'''
+memo
+
+x86
+55 89 E5 -> push ebp, mov ebp,esp
+C9 C3 -> leave,ret
+
+x64
+55 48 89 E5 -> push rbp, mov rbp,rsp
+C9 C3 -> leave,ret
+
+rax:eax:ax:ah:al
+
+
+'''
